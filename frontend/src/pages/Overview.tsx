@@ -1,4 +1,4 @@
-import React from 'react';
+
 import { Card } from '../components/Card';
 import { mockData } from '../mockData';
 import { Users, AlertTriangle, TrendingUp, Mic } from 'lucide-react';
