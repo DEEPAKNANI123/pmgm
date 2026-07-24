@@ -1,4 +1,4 @@
-import React from 'react';
+
 import { Card } from '../components/Card';
 import { mockData } from '../mockData';
 import { AlertCircle, CheckCircle2 } from 'lucide-react';
