@@ -1,0 +1,2604 @@
+{
+  "name": "PMGM",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtHour": 23
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        96,
+        176
+      ],
+      "id": "89e65e88-a3c3-480c-900e-fcb5660bc320",
+      "name": "Daily Performance Monitor"
+    },
+    {
+      "parameters": {
+        "url": " https://api.darwinbox.in/attendance",
+        "sendQuery": true,
+        "specifyQuery": "json",
+        "jsonQuery": "={\n  \"date\": \"{{ $now.minus({days:1}).toISODate() }}\"\n}",
+        "sendHeaders": true,
+        "specifyHeaders": "json",
+        "jsonHeaders": "{\n  \"Authorization\": \"Bearer YOUR_TOKEN\",\n  \"Content-Type\": \"application/json\"\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        304,
+        176
+      ],
+      "id": "de77a3f3-fef4-4762-a4fe-76e9e09c09c7",
+      "name": "Get Attendance"
+    },
+    {
+      "parameters": {
+        "url": "https://sap.company.com/api/output",
+        "sendHeaders": true,
+        "specifyHeaders": "json",
+        "jsonHeaders": "{\n \"Authorization\":\"Bearer TOKEN\"\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        512,
+        176
+      ],
+      "id": "3383f2f7-3aa8-4462-b90f-5f9d1c3c5548",
+      "name": "Get Production Output"
+    },
+    {
+      "parameters": {
+        "url": "https://qc-system.company.com/api/rejections",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        720,
+        176
+      ],
+      "id": "c6d4d3c9-48cb-48d8-aa9f-92781f86865e",
+      "name": "Get Quality Data"
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "fieldsToMatchString": "employee_id",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        720,
+        16
+      ],
+      "id": "4a7a7361-cd20-4b2b-8df8-3914132ab080",
+      "name": "Combine Employee Metrics"
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "fieldsToMatchString": "employee_id",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        912,
+        176
+      ],
+      "id": "98484dd6-52d4-4178-b172-f864455bc4b8",
+      "name": "Combine Employee Metrics1"
+    },
+    {
+      "parameters": {
+        "jsCode": "return items.map(item => {\n\n const attendance =\n item.json.attendance_percentage;\n\n const output =\n item.json.output_score;\n\n const rejection =\n item.json.rejection_rate;\n\n const decline =\n attendance < 85 &&\n output < 80 &&\n rejection > 10;\n\n return {\n  json:{\n   ...item.json,\n   declineDetected: decline\n  }\n };\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1120,
+        176
+      ],
+      "id": "c3b56915-95a9-4494-9a54-97c5b6a09e32",
+      "name": "Detect Decline"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "f43cec61-d7b3-43b1-8c24-47937ea85a78",
+              "leftValue": "={{$json.declineDetected}}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1312,
+        176
+      ],
+      "id": "56dead8b-0fb0-4adc-9e2c-d579c99f7729",
+      "name": "Performance Issue?"
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "mode": "list",
+          "value": ""
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "list",
+          "value": ""
+        }
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        1520,
+        272
+      ],
+      "id": "3f85ac40-a5f4-4ff3-aadd-28f4380f6ab4",
+      "name": "Log Healthy Status",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "GGfuiXBEBsE3u5g5",
+          "name": "Google Sheets OAuth2 API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "hasOutputParser": true,
+        "messages": {
+          "messageValues": [
+            {
+              "message": "=You are a manufacturing HR performance analyst.  Analyze:  Employee ID: {{$json.employee_id}}  Attendance: {{$json.attendance_percentage}}  Output: {{$json.output_score}}  Quality Rejection Rate: {{$json.rejection_rate}}  Determine:  1. Probable root causes. 2. Severity level. 3. Confidence score. 4. Recommended actions.  Respond ONLY JSON."
+            }
+          ]
+        },
+        "batching": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.9,
+      "position": [
+        1520,
+        80
+      ],
+      "id": "cb59487f-81fd-4bdb-8d14-55661b33adce",
+      "name": "Basic LLM Chain22"
+    },
+    {
+      "parameters": {
+        "model": "llama-3.3-70b-versatile",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGroq",
+      "typeVersion": 1,
+      "position": [
+        1520,
+        176
+      ],
+      "id": "72b37382-3f25-4849-9cac-b3339a156333",
+      "name": "Groq Chat Model24",
+      "credentials": {
+        "groqApi": {
+          "id": "Idf3icq2hlg7efdZ",
+          "name": "Groq account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "schemaType": "manual",
+        "inputSchema": "{\n  \"rootCause\":\"string\",\n  \"severity\":\"string\",\n  \"confidence\":\"number\",\n  \"actions\":[\"string\"]\n}"
+      },
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.3,
+      "position": [
+        1664,
+        176
+      ],
+      "id": "94b78010-c853-40ad-afaf-b6745a8481c9",
+      "name": "Structured Output Parser17"
+    },
+    {
+      "parameters": {
+        "messages": {
+          "messageValues": [
+            {
+              "message": "=Create a 30-day Performance Improvement Plan.  Employee: {{$json.employee_id}}  Root Cause: {{$json.rootCause}}  Actions: {{$json.actions}}  Return JSON only.  {  \"goal\":\"\",  \"weekly_targets\":[],  \"review_frequency\":\"\",  \"success_metrics\":[] }"
+            }
+          ]
+        },
+        "batching": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.9,
+      "position": [
+        1872,
+        80
+      ],
+      "id": "9634bbba-1a6a-47ab-a582-c34d98c0fe38",
+      "name": "Generate PIP"
+    },
+    {
+      "parameters": {
+        "model": "llama-3.3-70b-versatile",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGroq",
+      "typeVersion": 1,
+      "position": [
+        1872,
+        176
+      ],
+      "id": "c12bc270-3818-4ae4-9e98-58888bf9109c",
+      "name": "Groq Chat Model25",
+      "credentials": {
+        "groqApi": {
+          "id": "Idf3icq2hlg7efdZ",
+          "name": "Groq account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "https://api.darwinbox.in/tasks",
+        "sendHeaders": true,
+        "specifyHeaders": "json",
+        "jsonHeaders": "{\n \"Authorization\":\"Bearer TOKEN\",\n \"Content-Type\":\"application/json\"\n}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n \"employee_id\":\"{{$json.employee_id}}\",\n \"title\":\"Performance Improvement Plan\",\n \"description\":\"{{$json.goal}}\",\n \"priority\":\"High\"\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        2192,
+        80
+      ],
+      "id": "84048f47-20c5-48e4-8be1-7635ce16a918",
+      "name": "Create Darwinbox Task"
+    },
+    {
+      "parameters": {
+        "otherOptions": {}
+      },
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.4,
+      "position": [
+        2400,
+        80
+      ],
+      "id": "1b580876-4fcf-4b06-a3fc-aece9f02c4d5",
+      "name": "Notify Supervisor",
+      "webhookId": "17337f1e-0524-478e-8076-1ccb7653e4a8"
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "mode": "list",
+          "value": ""
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "list",
+          "value": ""
+        }
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        2576,
+        80
+      ],
+      "id": "7307fa13-4f35-4a4d-841d-a5609d4cd411",
+      "name": "Google Sheets",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "GGfuiXBEBsE3u5g5",
+          "name": "Google Sheets OAuth2 API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "content": "Autonomous Performance Monitoring",
+        "height": 496,
+        "width": 2752,
+        "color": 4
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        0,
+        0
+      ],
+      "typeVersion": 1,
+      "id": "d8ca67e4-8d30-42a2-9654-3fcd5ebdcd8c",
+      "name": "Sticky Note16"
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "weeks",
+              "triggerAtDay": [
+                1
+              ],
+              "triggerAtHour": 8
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        64,
+        784
+      ],
+      "id": "0766ac30-c198-4396-9de6-b6432217ab28",
+      "name": "Schedule Trigger5"
+    },
+    {
+      "parameters": {
+        "url": "https://api.darwinbox.in/api/v1/contract-workers",
+        "sendHeaders": true,
+        "specifyHeaders": "json",
+        "jsonHeaders": "{\n  \"Authorization\": \"Bearer YOUR_TOKEN\",\n  \"Content-Type\": \"application/json\"\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        272,
+        784
+      ],
+      "id": "93d8844f-90e1-4b51-aea9-5e12a6bd029e",
+      "name": "Get Contract Workers"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        480,
+        784
+      ],
+      "id": "4e89630f-6e90-41e6-a975-9842b0262a93",
+      "name": "Loop Over Items3"
+    },
+    {
+      "parameters": {
+        "url": "https://attendance.company.com/api/attendance",
+        "sendQuery": true,
+        "specifyQuery": "json",
+        "jsonQuery": "={\n  \"employeeId\":\"{{$json.employee_id}}\",\n  \"period\":\"30days\"\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        688,
+        768
+      ],
+      "id": "f3247e26-8df4-493d-8626-b23589972b16",
+      "name": "Get Attendance Data"
+    },
+    {
+      "parameters": {
+        "url": "https://erp.company.com/api/output",
+        "sendQuery": true,
+        "specifyQuery": "json",
+        "jsonQuery": "={\n \"employeeId\":\"{{$json.employee_id}}\"\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        896,
+        768
+      ],
+      "id": "6357a951-4f9c-4455-8366-924902cac2eb",
+      "name": "Get Production Output1"
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        1104,
+        768
+      ],
+      "id": "6a241b19-3962-438d-857f-a1c856af1e34",
+      "name": "Merge Worker Metrics"
+    },
+    {
+      "parameters": {
+        "jsCode": "const attendance = $json.attendance_rate;\nconst lateMarks = $json.late_marks;\nconst absentDays = $json.absent_days;\n\nconst output =\n($json.actual / $json.target) * 100;\n\nconst quality =\n$json.quality_score;\n\nlet score =\n(attendance * 0.4) +\n(output * 0.4) +\n(quality * 0.2);\n\nscore -= lateMarks * 1.5;\nscore -= absentDays * 2;\n\nscore = Math.max(0, Math.min(100, score));\n\nconst risk = 100 - score;\n\nreturn [{\njson:{\n...$json,\nreliability_score:score,\nattrition_risk:risk\n}\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1296,
+        768
+      ],
+      "id": "b31aea8d-3f65-4c92-91f1-84f3baca30f4",
+      "name": "Calculate Reliability Score"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "7b6579c8-58a9-4b7d-ab35-25bdf8de589a",
+              "leftValue": "={{$json.attrition_risk}}",
+              "rightValue": 70,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1472,
+        768
+      ],
+      "id": "1bfc223f-c153-42a3-aa69-4d796c776923",
+      "name": "High Risk Filter1"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Worker Name:\n{{$json.name}}\n\nAttendance Rate:\n{{$json.attendance_rate}}\n\nLate Marks:\n{{$json.late_marks}}\n\nAbsent Days:\n{{$json.absent_days}}\n\nOutput:\n{{$json.actual}}/{{$json.target}}\n\nQuality Score:\n{{$json.quality_score}}\n\nReliability Score:\n{{$json.reliability_score}}\n\nAttrition Risk:\n{{$json.attrition_risk}}\n\nGenerate retention recommendation.",
+        "hasOutputParser": true,
+        "messages": {
+          "messageValues": [
+            {
+              "message": "You are an HR Workforce Retention Specialist.  Analyze the contract worker data and provide:  1. Risk Summary 2. Possible Attrition Causes 3. Recommended Supervisor Actions 4. Urgency Level  Keep response under 150 words."
+            }
+          ]
+        },
+        "batching": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.9,
+      "position": [
+        1680,
+        672
+      ],
+      "id": "3a09e530-ee5f-4ad8-a509-18be5754f158",
+      "name": "Basic LLM Chain23"
+    },
+    {
+      "parameters": {
+        "model": "llama-3.3-70b-versatile",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGroq",
+      "typeVersion": 1,
+      "position": [
+        1680,
+        768
+      ],
+      "id": "db80b09c-afc6-492e-8b09-2690b2357ac6",
+      "name": "Groq Chat Model26",
+      "credentials": {
+        "groqApi": {
+          "id": "Idf3icq2hlg7efdZ",
+          "name": "Groq account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "schemaType": "manual",
+        "inputSchema": "{\n  \"risk_summary\": \"string\",\n  \"attrition_cause\": \"string\",\n  \"recommended_action\": \"string\",\n  \"urgency\": \"string\"\n}"
+      },
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.3,
+      "position": [
+        1824,
+        768
+      ],
+      "id": "a97d04e1-8732-48e2-ac25-aab4ec082367",
+      "name": "Structured Output Parser18"
+    },
+    {
+      "parameters": {
+        "otherOptions": {}
+      },
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.4,
+      "position": [
+        2032,
+        672
+      ],
+      "id": "00891943-f1c7-422c-b3a8-58577d8a04ba",
+      "name": "Send a message19",
+      "webhookId": "cab7f637-856f-454f-af4e-efc08c31cafe"
+    },
+    {
+      "parameters": {
+        "url": "https://api.darwinbox.in/tasks",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"employee_id\":\"{{$json.employee_id}}\",\n  \"task_name\":\"Retention Intervention\",\n  \"description\":\"{{$json.recommended_action}}\",\n  \"priority\":\"High\",\n  \"due_date\":\"{{ $now.plus({days:3}) }}\"\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        2240,
+        672
+      ],
+      "id": "e0e577cc-5d23-4027-b477-66e3edf2d5cd",
+      "name": "Create Intervention Task"
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "mode": "list",
+          "value": ""
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "list",
+          "value": ""
+        }
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        2448,
+        672
+      ],
+      "id": "29c70c0c-4b0d-427c-b4f6-be03fa47c51a",
+      "name": "Update Risk Dashboard",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "GGfuiXBEBsE3u5g5",
+          "name": "Google Sheets OAuth2 API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "mode": "list",
+          "value": ""
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "list",
+          "value": ""
+        }
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        1680,
+        880
+      ],
+      "id": "caffcdcc-2431-44db-9158-683e4dc56948",
+      "name": "Update Low Risk Dashboard",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "GGfuiXBEBsE3u5g5",
+          "name": "Google Sheets OAuth2 API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "content": "Contract Worker Risk Scoring & Alert",
+        "height": 528,
+        "width": 2736,
+        "color": 4
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        0,
+        560
+      ],
+      "typeVersion": 1,
+      "id": "5f72b97a-a267-4824-ab39-52df4ad481bd",
+      "name": "Contract Worker Risk Scoring & Alert"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "voice-review",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        64,
+        1424
+      ],
+      "id": "7322b4ac-e7cd-4154-bf27-b7e447e5ad07",
+      "name": "Trigger - WhatsApp Voice Review",
+      "webhookId": "21a4df93-0b4c-4ffe-9434-5263425cfc26"
+    },
+    {
+      "parameters": {
+        "url": "={{$json.audioUrl}}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        272,
+        1424
+      ],
+      "id": "38adbe47-7c65-46ed-a928-30cd720f11fd",
+      "name": "Detect Voice Note"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.groq.com/openai/v1/audio/transcriptions",
+        "sendHeaders": true,
+        "specifyHeaders": "json",
+        "jsonHeaders": "{\n  \"Authorization\": \"Bearer YOUR_GROQ_API_KEY\"\n}",
+        "sendBody": true,
+        "contentType": "multipart-form-data",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "file",
+              "value": "Binary Data"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        480,
+        1424
+      ],
+      "id": "3ea2544e-cdce-45e1-802f-0391f163ea5d",
+      "name": "Transcribe Audio"
+    },
+    {
+      "parameters": {
+        "jsCode": "const text = $json.text;\n\nlet language = \"English\";\n\nif(/[ఁ-౿]/.test(text))\n{\n language = \"Telugu\";\n}\n\nif(/[ऀ-ॿ]/.test(text))\n{\n language = \"Hindi\";\n}\n\nreturn [{\n  transcript:text,\n  language\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        688,
+        1424
+      ],
+      "id": "f3b37a20-0154-42c5-a2a8-febffc315ac1",
+      "name": "Detect Language"
+    },
+    {
+      "parameters": {
+        "hasOutputParser": true,
+        "messages": {
+          "messageValues": [
+            {
+              "message": "=You are an HR performance review analyst.  Analyze the supervisor transcript.  Transcript: {{ $json.transcript }}  Identify:  1. Strengths 2. Improvement Areas 3. Competencies Mentioned 4. Overall Sentiment 5. Professional Performance Journal Comment  Return ONLY valid JSON.  Schema:  {   \"strengths\":[      \"\"   ],   \"improvements\":[      \"\"   ],   \"competencies\":[      {        \"name\":\"\",        \"rating\":\"High|Medium|Low\"      }   ],   \"sentiment\":\"\",   \"journal_comment\":\"\" }"
+            }
+          ]
+        },
+        "batching": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.9,
+      "position": [
+        896,
+        1424
+      ],
+      "id": "cd4d989b-c47b-4cee-8c5b-256f6566d41a",
+      "name": "Basic LLM Chain24"
+    },
+    {
+      "parameters": {
+        "schemaType": "manual",
+        "inputSchema": "{\n  \"type\": \"object\",\n  \"properties\": {\n    \"strengths\": {\n      \"type\": \"array\",\n      \"items\": {\n        \"type\": \"string\"\n      }\n    },\n    \"improvements\": {\n      \"type\": \"array\",\n      \"items\": {\n        \"type\": \"string\"\n      }\n    },\n    \"competencies\": {\n      \"type\": \"array\",\n      \"items\": {\n        \"type\": \"object\",\n        \"properties\": {\n          \"name\": {\n            \"type\": \"string\"\n          },\n          \"rating\": {\n            \"type\": \"string\"\n          }\n        }\n      }\n    },\n    \"sentiment\": {\n      \"type\": \"string\"\n    },\n    \"journal_comment\": {\n      \"type\": \"string\"\n    }\n  }\n}"
+      },
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.3,
+      "position": [
+        1040,
+        1520
+      ],
+      "id": "754123e7-ea64-487d-a440-25dd9ef1a780",
+      "name": "Structured Output Parser19"
+    },
+    {
+      "parameters": {
+        "model": "llama-3.3-70b-versatile",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGroq",
+      "typeVersion": 1,
+      "position": [
+        896,
+        1520
+      ],
+      "id": "41375274-b32d-49ec-bd10-3ec6a97b8164",
+      "name": "Groq Chat Model27",
+      "credentials": {
+        "groqApi": {
+          "id": "Idf3icq2hlg7efdZ",
+          "name": "Groq account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "2394b90b-3db5-4603-903f-166be27915a9",
+              "leftValue": "={{$json.journal_comment.length > 20}}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1248,
+        1424
+      ],
+      "id": "1c586472-56fc-4f24-96f1-2947b778d9a7",
+      "name": "Review Quality Check"
+    },
+    {
+      "parameters": {
+        "url": "https://company.darwinbox.in/api/performance/journal",
+        "sendHeaders": true,
+        "specifyHeaders": "json",
+        "jsonHeaders": "{\n  \"Authorization\":\"Bearer YOUR_DARWINBOX_TOKEN\",\n  \"Content-Type\":\"application/json\"\n}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"employeeId\":\"{{$node['Trigger - WhatsApp Voice Review'].json['employeeId']}}\",\n  \"comment\":\"{{$json.journal_comment}}\",\n  \"sentiment\":\"{{$json.sentiment}}\",\n  \"source\":\"Voice Review Automation\"\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1456,
+        1328
+      ],
+      "id": "ad476344-4abe-48e7-bd99-b879672a3f67",
+      "name": "HTTP Request32"
+    },
+    {
+      "parameters": {
+        "otherOptions": {}
+      },
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.4,
+      "position": [
+        1664,
+        1328
+      ],
+      "id": "54e8b372-3cbf-40ad-bc85-3357efceedb6",
+      "name": "Notify Employee2",
+      "webhookId": "490c5d64-0ab6-4bb6-99ac-e20dc6bae7df"
+    },
+    {
+      "parameters": {
+        "operation": "upload",
+        "site": {
+          "__rl": true,
+          "mode": "list",
+          "value": ""
+        },
+        "fileName": "={{$now}}-{{$node[\"Trigger - WhatsApp Voice Review\"].json[\"employeeId\"]}}.txt",
+        "fileContents": "={{$node[\"Detect Language\"].json[\"transcript\"]}}",
+        "requestOptions": {}
+      },
+      "type": "n8n-nodes-base.microsoftSharePoint",
+      "typeVersion": 1,
+      "position": [
+        1872,
+        1328
+      ],
+      "id": "68b0e4e7-713f-4c60-b0bc-397f76a46c6b",
+      "name": "Upload file"
+    },
+    {
+      "parameters": {
+        "operation": "upload",
+        "site": {
+          "__rl": true,
+          "mode": "list",
+          "value": ""
+        },
+        "requestOptions": {}
+      },
+      "type": "n8n-nodes-base.microsoftSharePoint",
+      "typeVersion": 1,
+      "position": [
+        2080,
+        1328
+      ],
+      "id": "20946a11-d176-41d9-9b1a-b19d7a02a4f8",
+      "name": "Upload file1"
+    },
+    {
+      "parameters": {
+        "content": "Voice Review Capture & PMGM Update",
+        "height": 448,
+        "width": 2336,
+        "color": 4
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        32,
+        1232
+      ],
+      "typeVersion": 1,
+      "id": "e58c5ecc-8ed9-452c-a684-66db34836b32",
+      "name": "Sticky Note17"
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "months",
+              "triggerAtDayOfMonth": 30,
+              "triggerAtHour": 21
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        64,
+        1984
+      ],
+      "id": "2aa325ac-1d5d-4182-984c-d345874c83b0",
+      "name": "Schedule Trigger6"
+    },
+    {
+      "parameters": {
+        "url": "https://api.darwinbox.com/performance/v1/reviews",
+        "sendQuery": true,
+        "specifyQuery": "json",
+        "jsonQuery": "={\n  \"month\":\"{{$now.minus({months:1}).format('yyyy-MM')}}\"\n}",
+        "sendHeaders": true,
+        "specifyHeaders": "json",
+        "jsonHeaders": "={\n  \"Authorization\":\"Bearer {{$env.DARWINBOX_TOKEN}}\",\n  \"Content-Type\":\"application/json\"\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        272,
+        1984
+      ],
+      "id": "55cc2d6c-3a8a-4f1a-8573-b846ea97ff8e",
+      "name": "Get Performance Ratings"
+    },
+    {
+      "parameters": {
+        "url": "https://sap.company.com/api/production/monthly",
+        "sendHeaders": true,
+        "specifyHeaders": "json",
+        "jsonHeaders": "={\n \"Authorization\":\"Bearer {{$env.SAP_TOKEN}}\"\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        480,
+        1984
+      ],
+      "id": "f5f2b558-12fa-4e2f-b2a9-719a34a00d34",
+      "name": "Get Production Output2"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        688,
+        1984
+      ],
+      "id": "7027fde0-268e-4ade-994c-36667a0a5828",
+      "name": "Get Quality Rejections"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        880,
+        1984
+      ],
+      "id": "04a159b2-1d65-4db9-8713-47f0675eab25",
+      "name": "Get Rework Expenses"
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "fieldsToMatchString": "employeeId",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        880,
+        1840
+      ],
+      "id": "6b0ce830-2341-4047-b71b-583a2cf17dce",
+      "name": "Merge10"
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "fieldsToMatchString": "employeeId",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        1152,
+        2176
+      ],
+      "id": "8473529f-ebb9-48e8-ada3-422be075c984",
+      "name": "Merge11"
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "fieldsToMatchString": "employeeId",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        1376,
+        2000
+      ],
+      "id": "b7fe06e3-4609-4505-9d56-ba8bd1c5811a",
+      "name": "Merge12"
+    },
+    {
+      "parameters": {
+        "jsCode": "return items.map(item => {\n\n  const production =\n    item.json.productionValue || 0;\n\n  const rejection =\n    item.json.rejectionCost || 0;\n\n  const rework =\n    item.json.reworkCost || 0;\n\n  const rating =\n    item.json.rating || 0;\n\n  const profitImpact =\n    production -\n    rejection -\n    rework;\n\n  return {\n    json: {\n      ...item.json,\n      profitImpact\n    }\n  };\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1568,
+        2000
+      ],
+      "id": "b6900cb3-0449-4753-b36f-6335c301ef88",
+      "name": "Calculate Profit Impact"
+    },
+    {
+      "parameters": {
+        "messages": {
+          "messageValues": [
+            {
+              "message": "You are a manufacturing profitability consultant.  Analyze employee performance ratings, production output, rejection costs, rework expenses and profit impact.  Generate:  1. Executive Summary  2. Top 5 Employees  3. Top 5 Teams  4. Lowest Profit Contributors  5. Quality Issues  6. Recommended Actions  7. Overall Profitability Trend  Keep response professional."
+            }
+          ]
+        },
+        "batching": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.9,
+      "position": [
+        1776,
+        2000
+      ],
+      "id": "344cdab7-ad2e-4926-ae53-f1ac0318d80c",
+      "name": "Basic LLM Chain25"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGroq",
+      "typeVersion": 1,
+      "position": [
+        1776,
+        2096
+      ],
+      "id": "5751c941-8460-4a7e-aafa-61703bdaeb94",
+      "name": "Groq Chat Model28",
+      "credentials": {
+        "groqApi": {
+          "id": "Idf3icq2hlg7efdZ",
+          "name": "Groq account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "raw",
+        "jsonOutput": "{\n  \"htmlContent\": \"<html><body><h1>Monthly Profit Impact Report</h1><pre>{{$json.text}}</pre></body></html>\"\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        2112,
+        2000
+      ],
+      "id": "10f5fd48-2729-400b-be1a-fc9886145f13",
+      "name": "Generate HTML Report"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-htmlcsstopdf.htmlcsstopdf",
+      "typeVersion": 1,
+      "position": [
+        2320,
+        2000
+      ],
+      "id": "783043ed-ffd6-4d7f-85e4-a55a191fedb5",
+      "name": "Convert HTML to PDF"
+    },
+    {
+      "parameters": {
+        "resource": "mail",
+        "toEmail": "planthead@company.com chro@company.com",
+        "subject": "Monthly Profit Impact Report",
+        "contentValue": "Please find attached monthly profitability report.",
+        "additionalFields": {
+          "attachments": "profit_report.pdf"
+        }
+      },
+      "type": "n8n-nodes-base.sendGrid",
+      "typeVersion": 1,
+      "position": [
+        2528,
+        2000
+      ],
+      "id": "de87162d-8f52-4e23-9861-15037c9502d9",
+      "name": "Send an email1"
+    },
+    {
+      "parameters": {
+        "url": "https://api.powerbi.com/v1.0/myorg/datasets/{datasetId}/rows",
+        "sendHeaders": true,
+        "specifyHeaders": "json",
+        "jsonHeaders": "{\n \"employeeId\":\"EMP001\",\n \"profitImpact\":770000\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        2736,
+        2000
+      ],
+      "id": "b8e7fe2f-ae4b-4d54-b818-d9520749f549",
+      "name": "Update Dashboard"
+    },
+    {
+      "parameters": {
+        "schema": {
+          "__rl": true,
+          "mode": "list",
+          "value": "public"
+        },
+        "table": {
+          "__rl": true,
+          "mode": "list",
+          "value": ""
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        2944,
+        2000
+      ],
+      "id": "1b5106fd-8287-4504-a578-bbb65572536d",
+      "name": "Insert rows in a table",
+      "credentials": {
+        "postgres": {
+          "id": "HlXvca2L9EmO1xUk",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "content": "Performance-to-Profit Monthly Report\n",
+        "height": 672,
+        "width": 3184,
+        "color": 4
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        0,
+        1776
+      ],
+      "typeVersion": 1,
+      "id": "9bc7222c-830a-4b29-b2ef-e887bda37fb2",
+      "name": "Sticky Note18"
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "months",
+              "monthsInterval": 3,
+              "triggerAtHour": 9
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        64,
+        2864
+      ],
+      "id": "912aa6b4-0521-4cb9-94ee-599c70dadfc6",
+      "name": "Quarterly FTE Review Trigger"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        64,
+        3024
+      ],
+      "id": "fd3b7d56-44bd-490d-8d84-d436a6bc4be5",
+      "name": "HR Manual Review Trigger"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "fte-review",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        64,
+        2704
+      ],
+      "id": "84f69ec3-b8bc-4144-8ded-169f6880734e",
+      "name": "6 Month Tenure Webhook",
+      "webhookId": "106e3e91-8679-4c23-aac6-0d0188432816"
+    },
+    {
+      "parameters": {
+        "url": "https://api.darwinbox.com/contract-workers",
+        "sendHeaders": true,
+        "specifyHeaders": "json",
+        "jsonHeaders": "{\n  \"Authorization\": \"Bearer {{$env.DARWINBOX_TOKEN}}\",\n  \"Content-Type\": \"application/json\"\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        288,
+        2864
+      ],
+      "id": "d16525f8-5804-4410-bcdf-59546d7c814f",
+      "name": "Fetch Contract Workers"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        496,
+        2864
+      ],
+      "id": "ac43eba1-f7da-4756-91d7-4fb3f2cdcada",
+      "name": "Process Workers One By One"
+    },
+    {
+      "parameters": {
+        "url": "=https://attendance.company.com/api/history/{{$json.employeeId}}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        704,
+        2848
+      ],
+      "id": "e4be9b46-1ae7-45bf-8915-51e824b05085",
+      "name": "Fetch Attendance History"
+    },
+    {
+      "parameters": {
+        "url": "https://erp.company.com/api/output/{{$json.employeeId",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        912,
+        2848
+      ],
+      "id": "3e230e51-3a4c-47d6-8219-9637b631341f",
+      "name": "Fetch Productivity Metrics"
+    },
+    {
+      "parameters": {
+        "url": "=https://safety.company.com/api/incidents/{{$json.employeeId}}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1120,
+        2848
+      ],
+      "id": "26885499-7afc-4a89-ade0-f02a1442368f",
+      "name": "Fetch Safety Record"
+    },
+    {
+      "parameters": {
+        "jsCode": "const attendance =\n$input.item.json.attendancePercent || 0;\n\nconst productivity =\n$input.item.json.productivityScore || 0;\n\nconst quality =\n$input.item.json.qualityScore || 0;\n\nconst incidents =\n$input.item.json.incidentCount || 0;\n\nconst tenure =\n$input.item.json.tenureMonths || 0;\n\nconst safetyScore =\nMath.max(0,100 - (incidents * 20));\n\nconst tenureScore =\nMath.min(100,(tenure / 12) * 100);\n\nconst finalScore =\n(attendance * 0.25) +\n(productivity * 0.25) +\n(quality * 0.20) +\n(safetyScore * 0.15) +\n(tenureScore * 0.15);\n\nreturn [{\njson:{\n...$input.item.json,\nattendance,\nproductivity,\nquality,\nsafetyScore,\ntenureScore,\nfinalScore\n}\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1536,
+        2848
+      ],
+      "id": "0c1d919a-74c5-448d-a87e-588c88a8cbdb",
+      "name": "Compute FTE Score"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "e9ec0f0f-7bb6-41c7-a6c5-79af1a75c9f4",
+              "leftValue": "={{$json.finalScore >= 75}}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1744,
+        2848
+      ],
+      "id": "2b8cdc32-e89b-47de-a2d6-aba67f0c93c3",
+      "name": "FTE Eligible?"
+    },
+    {
+      "parameters": {
+        "url": "=https://quality.company.com/api/score/{{$json.employeeId}}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1328,
+        2848
+      ],
+      "id": "eabbb388-a7a7-4c7e-be08-e78b97d35dc8",
+      "name": "Fetch Quality Metrics"
+    },
+    {
+      "parameters": {
+        "jsCode": "employeeId: {{$json.employeeId}}\nname: {{$json.name}}\nfinalScore: {{$json.finalScore}}\nattendance: {{$json.attendance}}\nproductivity: {{$json.productivity}}\nquality: {{$json.quality}}\nsafetyScore: {{$json.safetyScore}}\ntenureMonths: {{$json.tenureMonths}}"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1952,
+        2752
+      ],
+      "id": "289851cf-3489-4df7-8660-999307cafff5",
+      "name": "Store Eligible Candidate"
+    },
+    {
+      "parameters": {
+        "jsCode": "employeeId: {{$json.employeeId}}\nname: {{$json.name}}\nfinalScore: {{$json.finalScore}}\nreason: \"Below eligibility threshold\""
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1952,
+        2944
+      ],
+      "id": "0a119c78-f8f2-4cdd-9cf7-4606aa766b31",
+      "name": "Store Rejected Candidate"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        2160,
+        2848
+      ],
+      "id": "05e313ff-0d6d-4387-9e40-150b3749ec68",
+      "name": "Merge Candidates"
+    },
+    {
+      "parameters": {
+        "jsCode": "const workers = $input.all();\n\nconst eligible = workers.filter(\nw => w.json.candidateStatus === 'Eligible'\n);\n\neligible.sort(\n(a,b)=>b.json.finalScore-a.json.finalScore\n);\n\nreturn eligible.map((worker,index)=>({\njson:{\n...worker.json,\nrank:index+1\n}\n}));\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2368,
+        2848
+      ],
+      "id": "dd34db73-d0f3-483a-8855-8f88b62c5e0c",
+      "name": "Rank Candidates"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "leftValue": "Immediate Conversion",
+                    "rightValue": "={{$json.finalScore >= 90}}",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "4d0bdf92-3620-42df-9d13-3bc1da1573b8"
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "9e98e116-f1cd-470e-9710-3e1f14d54411",
+                    "leftValue": "Strong Candidate",
+                    "rightValue": "={{$json.finalScore >= 80}}",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "80e88078-f367-4ed6-968f-d5f6513118ba",
+                    "leftValue": "Review Required",
+                    "rightValue": "={{$json.finalScore >= 70}}",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "none"
+        }
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        2592,
+        2832
+      ],
+      "id": "2a5106c0-65bc-47db-9332-c0252f10557d",
+      "name": "Switch6"
+    },
+    {
+      "parameters": {
+        "numberInputs": 3
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        2800,
+        2832
+      ],
+      "id": "a7955209-7a90-429c-9955-38ab38ae96c6",
+      "name": "Merge13"
+    },
+    {
+      "parameters": {
+        "hasOutputParser": true,
+        "messages": {
+          "messageValues": [
+            {
+              "message": "=You are a Senior HR Workforce Analyst.  Analyze the ranked FTE conversion candidates below.  {{ JSON.stringify($input.all().map(i => i.json), null, 2) }}  Generate:  1. Executive Summary  2. Top 5 FTE Conversion Candidates  3. Immediate Conversion Recommendations  4. Strong Candidates  5. Review Required Candidates  6. Risks and Concerns  7. Final Recommendation"
+            }
+          ]
+        },
+        "batching": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.9,
+      "position": [
+        3008,
+        2848
+      ],
+      "id": "7f68c450-e867-46ac-9ab0-dd63299dedb5",
+      "name": "Generate Executive Report"
+    },
+    {
+      "parameters": {
+        "model": "llama-3.3-70b-versatile",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGroq",
+      "typeVersion": 1,
+      "position": [
+        3008,
+        3008
+      ],
+      "id": "34beda3a-14d2-4240-90d8-3525815bae5d",
+      "name": "Groq Chat Model29",
+      "credentials": {
+        "groqApi": {
+          "id": "Idf3icq2hlg7efdZ",
+          "name": "Groq account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "schemaType": "manual"
+      },
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.3,
+      "position": [
+        3152,
+        3008
+      ],
+      "id": "6a4cd940-84a1-469f-95dd-802ef66301a7",
+      "name": "Structured Output Parser20"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "dae4eaed-ca50-483e-9060-da1b4a546607",
+              "name": "html",
+              "value": "=<!DOCTYPE html> <html> <head>     <title>FTE Conversion Report</title>     <style>         body {             font-family: Arial, sans-serif;             margin: 30px;         }         h1 {             color: #2c3e50;         }         table {             border-collapse: collapse;             width: 100%;         }         table, th, td {             border: 1px solid #cccccc;         }         th, td {             padding: 10px;             text-align: left;         }         .score {             font-weight: bold;             color: green;         }     </style> </head> <body>  <h1>FTE Conversion Report</h1>  <p><strong>Employee:</strong> {{$json.name}}</p>  <p><strong>Employee ID:</strong> {{$json.employeeId}}</p>  <p><strong>Rank:</strong> {{$json.rank}}</p>  <p><strong>Final Score:</strong> <span class=\"score\">{{$json.finalScore}}</span> </p>  <h2>Performance Breakdown</h2>  <table> <tr> <th>Metric</th> <th>Score</th> </tr>  <tr> <td>Attendance</td> <td>{{$json.attendance}}</td> </tr>  <tr> <td>Productivity</td> <td>{{$json.productivity}}</td> </tr>  <tr> <td>Quality</td> <td>{{$json.quality}}</td> </tr>  <tr> <td>Safety</td> <td>{{$json.safetyScore}}</td> </tr>  <tr> <td>Tenure</td> <td>{{$json.tenureScore}}</td> </tr>  </table>  <h2>Recommendation</h2>  <p>{{$json.recommendation}}</p>  </body> </html>",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        3360,
+        2848
+      ],
+      "id": "ed16c0a4-6985-416a-88a1-39b2d02c0def",
+      "name": "Build Report HTML"
+    },
+    {
+      "parameters": {
+        "operation": "URL/HTML to PDF",
+        "url": "https://api.pdf.co/v1/pdf/convert/from/html",
+        "advancedOptions": {
+          "header": "{\n \"x-api-key\":\"YOUR_KEY\"\n}"
+        }
+      },
+      "type": "n8n-nodes-pdfco.PDFco Api",
+      "typeVersion": 1,
+      "position": [
+        3568,
+        2848
+      ],
+      "id": "624f983b-51fe-4139-a2d7-0d489aa7dad2",
+      "name": "PDFco Api"
+    },
+    {
+      "parameters": {
+        "subject": "Quarterly FTE Conversion Recommendations",
+        "message": "=Attached is the latest FTE recommendation report.  Total Candidates: {{ $items().length }}  Generated Automatically.",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        3776,
+        2848
+      ],
+      "id": "10fdeb2d-1a6b-4427-8938-27fb48b135c3",
+      "name": "Notify HR Leadership",
+      "webhookId": "ecdd1079-3532-4cf4-ad5e-bf90976ac2df",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "R1rDANAChkZ4rYpJ",
+          "name": "Gmail OAuth2 API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "height": 688,
+        "width": 4054,
+        "color": 4
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        32,
+        2560
+      ],
+      "typeVersion": 1,
+      "id": "29805d01-b032-4262-905f-c357dee89f3a",
+      "name": "Sticky Note19"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Daily Performance Monitor": {
+      "main": [
+        [
+          {
+            "node": "Get Attendance",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Attendance": {
+      "main": [
+        [
+          {
+            "node": "Get Production Output",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Combine Employee Metrics",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Production Output": {
+      "main": [
+        [
+          {
+            "node": "Get Quality Data",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Combine Employee Metrics",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Get Quality Data": {
+      "main": [
+        [
+          {
+            "node": "Combine Employee Metrics1",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Combine Employee Metrics": {
+      "main": [
+        [
+          {
+            "node": "Combine Employee Metrics1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Combine Employee Metrics1": {
+      "main": [
+        [
+          {
+            "node": "Detect Decline",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Detect Decline": {
+      "main": [
+        [
+          {
+            "node": "Performance Issue?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Performance Issue?": {
+      "main": [
+        [
+          {
+            "node": "Basic LLM Chain22",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Log Healthy Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Basic LLM Chain22": {
+      "main": [
+        [
+          {
+            "node": "Generate PIP",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Groq Chat Model24": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Basic LLM Chain22",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Structured Output Parser17": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "Basic LLM Chain22",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate PIP": {
+      "main": [
+        [
+          {
+            "node": "Create Darwinbox Task",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Groq Chat Model25": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Generate PIP",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Darwinbox Task": {
+      "main": [
+        [
+          {
+            "node": "Notify Supervisor",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notify Supervisor": {
+      "main": [
+        [
+          {
+            "node": "Google Sheets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Schedule Trigger5": {
+      "main": [
+        [
+          {
+            "node": "Get Contract Workers",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Contract Workers": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Items3": {
+      "main": [
+        [
+          {
+            "node": "Get Attendance Data",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Loop Over Items3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Attendance Data": {
+      "main": [
+        [
+          {
+            "node": "Get Production Output1",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Merge Worker Metrics",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Get Production Output1": {
+      "main": [
+        [
+          {
+            "node": "Merge Worker Metrics",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge Worker Metrics": {
+      "main": [
+        [
+          {
+            "node": "Calculate Reliability Score",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Calculate Reliability Score": {
+      "main": [
+        [
+          {
+            "node": "High Risk Filter1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "High Risk Filter1": {
+      "main": [
+        [
+          {
+            "node": "Basic LLM Chain23",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Update Low Risk Dashboard",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Basic LLM Chain23": {
+      "main": [
+        [
+          {
+            "node": "Send a message19",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Groq Chat Model26": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Basic LLM Chain23",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Structured Output Parser18": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "Basic LLM Chain23",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send a message19": {
+      "main": [
+        [
+          {
+            "node": "Create Intervention Task",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Intervention Task": {
+      "main": [
+        [
+          {
+            "node": "Update Risk Dashboard",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Trigger - WhatsApp Voice Review": {
+      "main": [
+        [
+          {
+            "node": "Detect Voice Note",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Detect Voice Note": {
+      "main": [
+        [
+          {
+            "node": "Transcribe Audio",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Transcribe Audio": {
+      "main": [
+        [
+          {
+            "node": "Detect Language",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Detect Language": {
+      "main": [
+        [
+          {
+            "node": "Basic LLM Chain24",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Basic LLM Chain24": {
+      "main": [
+        [
+          {
+            "node": "Review Quality Check",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Structured Output Parser19": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "Basic LLM Chain24",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Groq Chat Model27": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Basic LLM Chain24",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Review Quality Check": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request32",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request32": {
+      "main": [
+        [
+          {
+            "node": "Notify Employee2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notify Employee2": {
+      "main": [
+        [
+          {
+            "node": "Upload file",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upload file": {
+      "main": [
+        [
+          {
+            "node": "Upload file1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Schedule Trigger6": {
+      "main": [
+        [
+          {
+            "node": "Get Performance Ratings",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Performance Ratings": {
+      "main": [
+        [
+          {
+            "node": "Get Production Output2",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Merge10",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Production Output2": {
+      "main": [
+        [
+          {
+            "node": "Get Quality Rejections",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Merge10",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Get Quality Rejections": {
+      "main": [
+        [
+          {
+            "node": "Get Rework Expenses",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Merge11",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Get Rework Expenses": {
+      "main": [
+        [
+          {
+            "node": "Merge11",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge10": {
+      "main": [
+        [
+          {
+            "node": "Merge12",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge11": {
+      "main": [
+        [
+          {
+            "node": "Merge12",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge12": {
+      "main": [
+        [
+          {
+            "node": "Calculate Profit Impact",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Calculate Profit Impact": {
+      "main": [
+        [
+          {
+            "node": "Basic LLM Chain25",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Basic LLM Chain25": {
+      "main": [
+        [
+          {
+            "node": "Generate HTML Report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Groq Chat Model28": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Basic LLM Chain25",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate HTML Report": {
+      "main": [
+        [
+          {
+            "node": "Convert HTML to PDF",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Convert HTML to PDF": {
+      "main": [
+        [
+          {
+            "node": "Send an email1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send an email1": {
+      "main": [
+        [
+          {
+            "node": "Update Dashboard",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Dashboard": {
+      "main": [
+        [
+          {
+            "node": "Insert rows in a table",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Quarterly FTE Review Trigger": {
+      "main": [
+        [
+          {
+            "node": "Fetch Contract Workers",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HR Manual Review Trigger": {
+      "main": [
+        [
+          {
+            "node": "Fetch Contract Workers",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "6 Month Tenure Webhook": {
+      "main": [
+        [
+          {
+            "node": "Fetch Contract Workers",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Contract Workers": {
+      "main": [
+        [
+          {
+            "node": "Process Workers One By One",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Process Workers One By One": {
+      "main": [
+        [
+          {
+            "node": "Fetch Attendance History",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Process Workers One By One",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Attendance History": {
+      "main": [
+        [
+          {
+            "node": "Fetch Productivity Metrics",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Productivity Metrics": {
+      "main": [
+        [
+          {
+            "node": "Fetch Safety Record",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Safety Record": {
+      "main": [
+        [
+          {
+            "node": "Fetch Quality Metrics",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Compute FTE Score": {
+      "main": [
+        [
+          {
+            "node": "FTE Eligible?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "FTE Eligible?": {
+      "main": [
+        [
+          {
+            "node": "Store Eligible Candidate",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Store Rejected Candidate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Quality Metrics": {
+      "main": [
+        [
+          {
+            "node": "Compute FTE Score",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Store Eligible Candidate": {
+      "main": [
+        [
+          {
+            "node": "Merge Candidates",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Store Rejected Candidate": {
+      "main": [
+        [
+          {
+            "node": "Merge Candidates",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge Candidates": {
+      "main": [
+        [
+          {
+            "node": "Rank Candidates",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Rank Candidates": {
+      "main": [
+        [
+          {
+            "node": "Switch6",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch6": {
+      "main": [
+        [
+          {
+            "node": "Merge13",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Merge13",
+            "type": "main",
+            "index": 1
+          }
+        ],
+        [
+          {
+            "node": "Merge13",
+            "type": "main",
+            "index": 2
+          }
+        ]
+      ]
+    },
+    "Merge13": {
+      "main": [
+        [
+          {
+            "node": "Generate Executive Report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Executive Report": {
+      "main": [
+        [
+          {
+            "node": "Build Report HTML",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Groq Chat Model29": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Generate Executive Report",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Structured Output Parser20": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "Generate Executive Report",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Report HTML": {
+      "main": [
+        [
+          {
+            "node": "PDFco Api",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PDFco Api": {
+      "main": [
+        [
+          {
+            "node": "Notify HR Leadership",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "02d9be81-c95f-47ea-99f3-34ffa8c88466",
+  "meta": {
+    "instanceId": "2703da53b8ab48022e9910bfb905da40f9c50fad347da62bbc278eeaa17ffe27"
+  },
+  "id": "apEPrkPYgicT1uT7",
+  "tags": []
+}
