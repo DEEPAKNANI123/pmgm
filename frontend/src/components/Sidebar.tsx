@@ -1,4 +1,4 @@
-import React from 'react';
+
 import { LayoutDashboard, Activity, AlertTriangle, Mic } from 'lucide-react';
 
 interface SidebarProps {
